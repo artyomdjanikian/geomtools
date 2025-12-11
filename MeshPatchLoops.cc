@@ -566,19 +566,20 @@ void PatchLoops(MyMesh &mesh, double loopStep)
         }
       }
     }
-     static int nCandidates = 0;
-     ccPly.WritePLY(std::string("candidates").append(std::to_string(nCandidates++)).append(std::string(".ply")));
-     printf("write out candidates\n");
-     getchar();
-    }
 
-    OpenMesh::IO::write_mesh(mesh, "allcandidates.ply");
+//    {
+//      static int nCandidates = 0;
+//      ccPly.WritePLY(std::string("candidates").append(std::to_string(nCandidates++)).append(std::string(".ply")));
+//      printf("write out candidates\n");
+//    }
+  }
 
+  OpenMesh::IO::write_mesh(mesh, "allcandidates.ply");
 
-    auto adjMatrix = MeshSamplingEdges(points);
-    MyMesh patchMesh = MeshSamplingCycles(points, adjMatrix);
+  auto adjMatrix = MeshSamplingEdges(points);
+  MyMesh patchMesh = MeshSamplingCycles(points, adjMatrix);
 
-    OpenMesh::IO::write_mesh(patchMesh, "patchmesh.ply");
+  OpenMesh::IO::write_mesh(patchMesh, "patchmesh.ply");
 }
 
 

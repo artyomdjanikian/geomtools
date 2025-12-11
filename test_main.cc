@@ -88,10 +88,10 @@ TEST(ConvexifyPolyTest, BootShapedConcave)
 // triangle area and distance to a point
 TEST(Tools3dTest, Triangle3dTest)
 {
-    Eigen::Vector3d pntA(0,0,0);
-    Eigen::Vector3d pntB(1, 2, 3);
-    Eigen::Vector3d pntC(4, -5, 6);
-    Eigen::Vector3d pntD(2, 2, 2);
+    Eigen::Vector3d pntA(0, 0, 3);
+    Eigen::Vector3d pntB(0, 1, 3);
+    Eigen::Vector3d pntC(1, 1, 3);
+    Eigen::Vector3d pntD(0.5, 0.5, 2);
 
     Triangle3d triangle(pntA, pntB, pntC);
 
@@ -99,10 +99,10 @@ TEST(Tools3dTest, Triangle3dTest)
 
     printf("%.6f\n", closestPnt.second);
 
-    double checkDist = 1.2987012987012991;
+    double checkDist = 1.0;
     EXPECT_DOUBLE_EQ(closestPnt.second, checkDist);
 
-    double checkArea = 30.561413579872251;
+    double checkArea = 0.5;
     double area = triangle.GetArea();
 
     EXPECT_DOUBLE_EQ(area, checkArea);

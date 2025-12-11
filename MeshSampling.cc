@@ -142,7 +142,7 @@ std::pair<std::vector<MyMesh::VertexHandle>, std::vector<Eigen::Vector3d>> MeshS
 
         std::vector<MyMesh::HalfedgeHandle> neighborhood = MeshSamplingNeighborhood(mesh, closestVertex, 1.5*step);
 
-        printf("curr point %lu (%.6f, %.6f, %.6f)\n", iBestPnt, currPoint[0], currPoint[1], currPoint[2]);
+//        printf("curr point %lu (%.6f, %.6f, %.6f)\n", iBestPnt, currPoint[0], currPoint[1], currPoint[2]);
 
         // make a step at each +-u/v direction
         for(int i = 0; i < 4; i++) {
@@ -154,9 +154,9 @@ std::pair<std::vector<MyMesh::VertexHandle>, std::vector<Eigen::Vector3d>> MeshS
 //          uvPoints.push_back(uvPnt);
           auto np = tree.FindNearestPoint(currPoint + crossVec*step);
 
-          printf("  neighborX  (%.6f, %.6f, %.6f) at %.6f\n", uvPnt[0], uvPnt[1], uvPnt[2], (currPoint - uvPnt).norm());
+//          printf("  neighborX  (%.6f, %.6f, %.6f) at %.6f\n", uvPnt[0], uvPnt[1], uvPnt[2], (currPoint - uvPnt).norm());
 
-          printf("  projection (%.6f, %.6f, %.6f) at %.6f\n", np.pnt[0], np.pnt[1], np.pnt[2], (currPoint - np.pnt).norm());
+//          printf("  projection (%.6f, %.6f, %.6f) at %.6f\n", np.pnt[0], np.pnt[1], np.pnt[2], (currPoint - np.pnt).norm());
 
           uvPoints.push_back(np.pnt);
 //          uvPoints.push_back(uvPnt);
@@ -287,6 +287,9 @@ Eigen::Vector3d MeshSamplingNeighbor(MyMesh &mesh, Eigen::Vector3d sourcePnt, do
 {
 //  Eigen::Vector3d pnt = toVec(mesh.point(sourceVertex));
 
+//  printf(" (%.6f, %.6f, %.6f) rad %.6f, %.6f normal, %.6f dir, %lu neighbors\n", sourcePnt[0], sourcePnt[1], sourcePnt[2], rad, normal.norm(), dir.norm(), neighborhood.size());
+
+
   // build a plane passing through point containing norm and dir 
   Eigen::Vector3d planeNormal = cross(normal, dir);
   Plane3d dirPlane(sourcePnt, planeNormal);
@@ -365,7 +368,6 @@ Eigen::Vector3d MeshSamplingNeighbor(MyMesh &mesh, Eigen::Vector3d sourcePnt, do
   eply.AddVertex(npnt, 1.0, 0.0, 0.0);
 
 //  eply.WritePLY("neighborx.ply");
-//  getchar();
 
   return npnt;
 }
@@ -648,7 +650,7 @@ std::pair<std::vector<MyMesh::VertexHandle>, std::vector<int>> MeshSamplingClust
             for(MyMesh::FaceVertexIter fv_it = mesh.fv_iter(closestFacetHandle); fv_it.is_valid(); ++fv_it) {
               const auto &pnt = mesh.point(*fv_it);
 
-              double currDist = centroid.first.dot(toVec(pnt));
+              double currDist = (centroid.first - toVec(pnt)).norm();
 
               if(closestDist < 0.0 || currDist < closestDist) {
                 closestVertexHandle = *fv_it;

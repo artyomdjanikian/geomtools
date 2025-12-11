@@ -18,22 +18,21 @@ template <typename T> Eigen::Vector3d toVec(const T& t)
     return Eigen::Vector3d(t[0], t[1], t[2]);
 }
 
-#if 0
 namespace {
-double distSq(const Eigen::Vector3d &a, const Eigen::Vector3d &b)
-{
-    double distanceSq = 0.0;
-
-    for (size_t iC = 0; iC < 3; iC++)
+    double distSq(const Eigen::Vector3d &a, const Eigen::Vector3d &b)
     {
-        double thisDist = a[iC] - b[iC];
-        distanceSq += thisDist * thisDist;
-    }
+        double distanceSq = 0.0;
 
-    return distanceSq;
+        for (size_t iC = 0; iC < 3; iC++)
+        {
+            double thisDist = a[iC] - b[iC];
+            distanceSq += thisDist * thisDist;
+        }
+
+        return distanceSq;
+    }
 }
-}
-#endif
+
 // from tribox3.cc
 int triBoxOverlap(double boxcenter[3],double boxhalfsize[3],double triverts[3][3]);
 
@@ -83,12 +82,11 @@ struct Line3d {
         double pdistSq = -1.0;
 
         if(dotProd <= eps)
-            pdistSq = pnts[0].dot(pnt);
+            pdistSq = distSq(pnts[0], pnt);
         else if(dotProd >= 1.0-eps)
-            pdistSq = pnts[1].dot(pnt);
-        else {
-            pdistSq = Eval(dotProd).dot(pnt);
-        }
+            pdistSq = distSq(pnts[1], pnt);
+        else
+            pdistSq = distSq(Eval(dotProd), pnt);
 
         return pdistSq;
     }
@@ -337,7 +335,7 @@ struct Triangle3d {
             }
         }
 
-        return normal;
+        return normal*0.5;
     }
 
     Eigen::Vector3d GetNormal() const {
@@ -397,7 +395,7 @@ struct Triangle3d {
             bool isInside = IsPointInside(projPnt);
 
             if(isInside)
-                return {projPnt, pnt.dot(projPnt)};
+                return {projPnt, distSq(pnt, projPnt)};
         }
 
         double edgeDists[3];
@@ -431,13 +429,13 @@ struct Triangle3d {
                 else // (param*segLen > eps && param*segLen < segLen-eps) - segment interior
                     segPnt = lineSeg.Eval(param);
 
-                edgeDists[iEdge] = pnt.dot(segPnt);
+                edgeDists[iEdge] = distSq(pnt, segPnt);
                 edgePnts[iEdge] = segPnt;
             }
             else {
                 auto segPnt = pnts[iEdge];
                 vertexIds[iEdge] = iEdge;
-                edgeDists[iEdge] = pnt.dot(segPnt);
+                edgeDists[iEdge] = distSq(pnt, segPnt);
                 edgePnts[iEdge] = segPnt;
             }
         }
@@ -586,6 +584,5 @@ private:
     std::array<Eigen::Vector3d, 3> pnts;
 };
 
-Eigen::Vector3d CrossPoint(const std::vector<Eigen::Vector3d> &pnts, size_t iPnt, const Line3d &ray);
 std::vector<Eigen::Vector3d> Sample(const Line3d &seg, double step);
 

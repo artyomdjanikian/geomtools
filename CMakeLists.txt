@@ -21,4 +21,4 @@ else()
 
 endif()
 
-target_link_libraries(Tests PRIVATE gtest gtest_main pthread)
+target_link_libraries(Tests PRIVATE gtest OpenMeshCore OpenMeshTools gtest_main pthread)
