@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 #include <fstream>
 #include <vector>
@@ -6,6 +8,8 @@
 
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Geometry>
+
+// mass and spring simulation class
 
 struct Bounds3d;
 

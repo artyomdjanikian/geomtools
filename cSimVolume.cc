@@ -6,9 +6,13 @@
 #include <eigen3/Eigen/Eigenvalues>
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Geometry>
+
+#include "common.h"
+
 #include "cSimVolume.h"
 #include "tools3d.h"
 #include "happly.h"
+#include "AABBTree.h"
 
 void cSimVolume::initAnisotropic(const Bounds3d &bounds, double _step)
 {
@@ -928,3 +932,187 @@ void cSimVolume::computeExternalMedialAxis()
     // Write the object to file
     plyOut.write("mediax.ply", happly::DataFormat::ASCII);    
 }
+
+// apply loads, compute deformation, find external medial axis points that would be good candidates for placing stiffness ribs through
+void SimVolumeTest(MyMesh &mesh, const AABBTree &tree, int nIter, int nCycles, Bounds3d bounds, double step, double dT, double ff)
+{
+  printf("%d iters, dT = %.6f\n", nIter, dT);
+  printf("compute closest points using tree\n");
+
+  happly::PLYData plyOut;
+
+  std::vector<std::array<double, 3>> meshVertexPositions;
+  std::vector<std::array<double, 3>> meshVertexColors;
+
+  //  meshVertexPositions.resize(mesh.n_vertices());
+  //  meshVertexColors.resize(mesh.n_vertices());
+
+  mesh.request_face_normals();
+  mesh.update_normals();
+
+  cSimVolume simVolume;
+
+  //    simVolume.init(bounds, 0.33);
+  simVolume.initAnisotropic(bounds, step);
+
+  printf("init, step %.6f\n", simVolume.getStep());
+
+  int nFixedMasses = 0;
+  int nForcedMasses = 0;
+
+  for (size_t i = 0; i < simVolume.GetNi(); i++)
+    for (size_t j = 0; j < simVolume.GetNj(); j++)
+      for (size_t k = 0; k < simVolume.GetNk(); k++)
+      {
+        auto pnt = simVolume.GetPoint(i, j, k);
+
+        //          if(j == 0 && k == 0)
+        //            printf("test point (%6f, %.6f, %.6f)\n", pnt[0], pnt[1], pnt[2]);
+
+        auto closestPnt = tree.FindNearestPoint(pnt);
+
+        //          if(j == 0 && k == 0)
+        //            printf("facet %d distance %.6f, (%.6f, %.6f, %.6f)\n", closestPnt.facetIndex, closestPnt.dist,
+        //                  closestPnt.pnt[0], closestPnt.pnt[1], closestPnt.pnt[2]);
+
+        //          if(pnt[2] < -3.9)
+        //            isFixed = true;
+
+        bool isInside = false;
+        if (closestPnt.dist >= 0)
+          isInside = true;
+
+        bool isFixed = false;
+        bool isForced = false;
+        bool isForcedBack = false;
+
+        if (isInside && closestPnt.dist < 1.5 * simVolume.getStep())
+        {
+          //            printf("(%.6f, %.6f, %.6f)\n", pnt[0], pnt[1], pnt[2]);
+          //            printf("(%.6f, %.6f, %.6f), dist %.6f, facet %d\n", pnt[0], pnt[1], pnt[2], closestPnt.dist, closestPnt.facetIndex);
+
+          MyMesh::FaceHandle facetHandle(closestPnt.facetIndex);
+
+          int nFixed = 0;
+          int nForced = 0;
+          int nForcedBack = 0;
+
+          MyMesh::FaceVertexIter fv_it = mesh.fv_iter(facetHandle);
+          for (; fv_it.is_valid(); ++fv_it)
+          {
+            auto vcolor = mesh.color(*fv_it);
+
+            //              printf("   %d, %d, %d\n", vcolor[0], vcolor[1], vcolor[2]);
+
+            if (vcolor[0] == 255 && vcolor[1] == 0 && vcolor[2] == 0)
+              nForced++;
+
+            if (vcolor[2] == 255 && vcolor[1] == 0 && vcolor[0] == 0)
+              nFixed++;
+
+            if (vcolor[0] == 255 && vcolor[1] == 255 && vcolor[2] == 0)
+              nForcedBack++;
+          }
+
+          if (nForced == 3)
+            isForced = true;
+
+          if (nForcedBack == 3)
+          {
+            isForcedBack = true;
+            printf("*");
+          }
+
+          if (nFixed == 3)
+            isFixed = true;
+
+          //            if(isForced || isFixed)
+          //              printf("   %d, %d\n", isForced, isFixed);
+        }
+
+        Eigen::Vector3d gForce(0.0, 0.0, 0.0);
+
+        if (isForced)
+          gForce[2] = ff;
+        else if (isForcedBack)
+          gForce[2] = -ff;
+
+        if (isFixed)
+          nFixedMasses++;
+
+        if (isForced || isForcedBack)
+          nForcedMasses++;
+
+        double invMass = isInside ? isFixed ? 0.0 : 1.0 : -1.0;
+
+        simVolume.SetProperties(i, j, k, gForce, invMass);
+
+        //          if(invMass < 0.0)
+        simVolume.SetExternalPoint(i, j, k, closestPnt.pnt, closestPnt.dist);
+      }
+
+  // Add mesh data (elements are created automatically)
+  // plyOut.addVertexPositions(meshVertexPositions);
+  // plyOut.addVertexColors(meshVertexColors);
+
+  // Write the object to file
+  // plyOut.write("pnts.ply", happly::DataFormat::ASCII);
+
+  printf("%d fixed, %d forced masses\n", nFixedMasses, nForcedMasses);
+
+  for (int iTry = 0; iTry < nCycles; iTry++)
+  {
+
+    simVolume.computeExternalMedialAxis();
+
+    simVolume.savePLY("init.ply", 0);
+
+    simVolume.simulate(nIter, dT);
+
+    simVolume.extrapolateStrain(1000);
+
+    simVolume.savePLY("simul.ply", 1);
+  }
+
+  //    simVolume.savePLY("simul1.ply", 1);
+
+  int nGrid = 10;
+  for (int i = 0; i <= nGrid; i++)
+  {
+    double x = (bounds.minBound[0] * (nGrid - i) + bounds.maxBound[0] * i) * 1.0 / nGrid;
+
+    for (int j = 0; j <= nGrid; j++)
+    {
+      double y = (bounds.minBound[1] * (nGrid - j) + bounds.maxBound[1] * j) * 1.0 / nGrid;
+
+      for (int k = 0; k <= nGrid; k++)
+      {
+        double z = (bounds.minBound[2] * (nGrid - k) + bounds.maxBound[2] * k) * 1.0 / nGrid;
+
+        auto closestPnt = tree.FindNearestPoint({x, y, z});
+
+        auto normal = mesh.normal(MyMesh::FaceHandle(closestPnt.facetIndex));
+        //            printf("%.6f, %.6f, %.6f\n", normal[0], normal[1], normal[2]);
+
+        meshVertexPositions.push_back({x, y, z});
+
+        if (closestPnt.dist < 0.0)
+          meshVertexColors.push_back({1.0, 0, 0});
+        else
+          meshVertexColors.push_back({0, 0, 1.0});
+
+        meshVertexPositions.push_back({closestPnt.pnt[0], closestPnt.pnt[1], closestPnt.pnt[2]});
+        meshVertexColors.push_back({0, 1.0, 0});
+      }
+    }
+  }
+
+  // Add mesh data (elements are created automatically)
+  plyOut.addVertexPositions(meshVertexPositions);
+  plyOut.addVertexColors(meshVertexColors);
+
+  // Write the object to file
+  plyOut.write("pnts.ply", happly::DataFormat::ASCII);
+};
+
+//  __SimVolumeTest(nIter, nCycles, bounds, step, dT, ff);
