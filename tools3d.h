@@ -33,10 +33,15 @@ namespace {
     }
 }
 
+bool DoIntersect(const Triangle3d &triangleA, const Triangle3d &triangleB);
+
 // from tribox3.cc
 int triBoxOverlap(double boxcenter[3],double boxhalfsize[3],double triverts[3][3]);
 
 // from tritri_isectline.cc
+int tri_tri_intersect(double V0[3],double V1[3],double V2[3],
+				                    double U0[3],double U1[3],double U2[3]);
+
 int tri_tri_intersect_with_isectline(double V0[3],double V1[3],double V2[3],
 				                    double U0[3],double U1[3],double U2[3],int *coplanar,
 				                    double isectpt1[3],double isectpt2[3]);
@@ -449,7 +454,7 @@ struct Triangle3d {
         return {edgePnts[iShortestDist], edgeDists[iShortestDist]};
     }
 
-   int IntersectLine(const Line3d &line, std::pair<double, double> *pParams = nullptr) const {
+    int IntersectLine(const Line3d &line, std::pair<double, double> *pParams = nullptr) const {
         int nX = 0;
 
         auto plane = Plane3d(pnts[0], pnts[1], pnts[2]);
@@ -577,6 +582,11 @@ struct Triangle3d {
         return circumradius > eps ? (2 * inradius)/circumradius : 0.0;
     }
 
+    void Print() const {
+        for(const auto &pnt : pnts)
+            printf("%.6f %.6f %.6f 255 0 0\n", pnt[0], pnt[1], pnt[2]);
+    }
+
 //    std::vector<Eigen::Vector3d> Sample(double step) const;
 // TODO : implement
 
@@ -585,4 +595,3 @@ private:
 };
 
 std::vector<Eigen::Vector3d> Sample(const Line3d &seg, double step);
-

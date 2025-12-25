@@ -2437,7 +2437,8 @@ MyMesh MeshSamplingCycles(const std::vector<Eigen::Vector3d> &points, std::vecto
 
             auto sourceLoops = detectLoops(thisEdge.first, thisEdge.second, true, true);
 
-//            printf("detectLoops : edge (%d, %d), %lu loops\n", thisEdge.first, thisEdge.second, sourceLoops.size());
+            if(thisEdge.second != -1 && sourceLoops.size())
+              printf("detectLoops : edge (%d, %d), %lu loops, %lu edges\n", thisEdge.first, thisEdge.second, sourceLoops.size(), sourceLoops.front().size());
 
             for(auto && sourceLoop : sourceLoops) {
 
@@ -2449,7 +2450,7 @@ MyMesh MeshSamplingCycles(const std::vector<Eigen::Vector3d> &points, std::vecto
                     int jj = (ii+1)%sourceLoop.size();
 
                     // get opposite edge
-                    edgeStack.push_back({sourceLoop[jj], sourceLoop[ii]});
+                    edgeStack.push_front({sourceLoop[jj], sourceLoop[ii]});
 
                     if(sourceLoop[ii] == thisEdge.first && sourceLoop[jj] == thisEdge.second) {
 //                      printf("  edge\n");
@@ -2461,8 +2462,10 @@ MyMesh MeshSamplingCycles(const std::vector<Eigen::Vector3d> &points, std::vecto
                     }
                 }
             
-                if(!edgeFound && sourceLoop.size())
-                  printf("  !!! start edge not found in loop of %lu !!!\n", sourceLoop.size());
+                if(!edgeFound && sourceLoop.size() && thisEdge.second != -1) {
+                  printf("  !!! start edge (%d, %d) not found in loop of %lu !!!\n", thisEdge.first, thisEdge.second, sourceLoop.size());
+                  getchar();
+                }
                 loops.emplace_back(sourceLoop);
             }
 
@@ -2485,12 +2488,15 @@ MyMesh MeshSamplingCycles(const std::vector<Eigen::Vector3d> &points, std::vecto
     }
 
     for(const auto &loop : loops) {
-      std::vector<MyMesh::VertexHandle> handles;
 
-      for(auto ii : loop)
-        handles.push_back(MyMesh::VertexHandle(ii));
+      if(loop.size() <= 6) {
+        std::vector<MyMesh::VertexHandle> handles;
 
-      voroMesh.add_face(handles);
+        for(auto ii : loop)
+          handles.push_back(MyMesh::VertexHandle(ii));
+
+        voroMesh.add_face(handles);
+      }
     }
 
     printf("voro mesh has %d vertices, %d faces\n", voroMesh.n_vertices(), voroMesh.n_faces());

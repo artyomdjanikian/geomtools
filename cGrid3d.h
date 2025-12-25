@@ -88,6 +88,10 @@ size_t GetNi() const { return Ni; }
 size_t GetNj() const { return Nj; }
 size_t GetNk() const { return Nk; }
 
+// TODO : point handle
+// TODO : point handle iterator
+// TODO : point handle neighbor iterator
+
 Eigen::Vector3d GetPosition(size_t i, size_t j, size_t k) { 
     Eigen::Vector3d shift = m_bounds.minBound; 
     shift[0] += i*m_step; shift[1] += j*m_step; shift[2] += k*m_step;

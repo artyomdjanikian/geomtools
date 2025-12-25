@@ -7,7 +7,7 @@ enable_testing()
 
 vci_add_executable (SimpleCuts main_SimpleCuts.cc cSimVolume.cc Dijxtra.cc AABBTree.cc MeshParallel.cc MeshFloodFill.cc SimulateCloth.cc MeshTools.cc cOctree.cc MeshSampling.cc MeshCrossField.cc VolumePoints.cc MeshTopoCuts.cc SDF.cc  QuadRemesh.cc tools3d.cc raytri.cc tribox3.cc tritri_isectline.cc)
 vci_add_executable (PatchLoops main_PatchLoops.cc MeshPatchLoops.cc Dijxtra.cc PointSet.cc AABBTree.cc MeshParallel.cc MeshFloodFill.cc SimulateCloth.cc MeshTools.cc cOctree.cc MeshSampling.cc MeshCrossField.cc VolumePoints.cc MeshTopoCuts.cc SDF.cc tools3d.cc raytri.cc tribox3.cc tritri_isectline.cc)
-vci_add_executable (Tests test_main.cc tools3d.cc)
+vci_add_executable (Tests test_main.cc tools3d.cc cSimVolume.cc Dijxtra.cc AABBTree.cc MeshParallel.cc MeshFloodFill.cc SimulateCloth.cc MeshTools.cc cOctree.cc MeshSampling.cc MeshCrossField.cc VolumePoints.cc MeshTopoCuts.cc SDF.cc  QuadRemesh.cc tools3d.cc raytri.cc tribox3.cc tritri_isectline.cc)
 
 find_package(OpenMP)
 

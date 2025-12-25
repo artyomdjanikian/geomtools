@@ -8,6 +8,12 @@
 #include <gtest/gtest.h>
 #include <eigen3/Eigen/Core>
 
+#include "common.h"
+#include "AABBTree.h"
+#include "cGrid3d.h"
+#include "cOctree.h"
+#include "cSimVolume.h"
+#include "MeshTools.h"
 #include "ConvexifyPolygon.h"
 #include "tools3d.h"
 
@@ -118,16 +124,50 @@ int main(int argc, char * argv[])
         exit(1);
     }
 
-    exit(0);
+    int nIter = argc > 2 ? atoi(argv[2]) : 100;
+    int nCycles = argc > 3 ? atoi(argv[3]) : 3;
+    double step = argc > 4 ? atof(argv[4]) : 5.0;
+    double dT = argc > 5 ? atof(argv[5]) : 0.005;
+    double ff = argc > 6 ? atof(argv[6]) : 1.0;
 
-    // TODO : plug here
-    // SDFTest(nIter, mesh, tree);
+    MyMesh mesh;
+    mesh.request_face_normals();
+    mesh.request_vertex_normals();
+    mesh.request_vertex_colors();
+    // IO::Options ropt;
 
-    // OctreeTest(nIter, mesh, tree);
+    // -------------------- read mesh
+
+    // TODO : extract into OpenMeshMP
+
+    printf("read mesh %s\n", argv[1]);
+
+    OpenMesh::IO::Options ropt;
+    ropt += OpenMesh::IO::Options::Binary;
+    ropt += OpenMesh::IO::Options::VertexColor;
+
+    if (!OpenMesh::IO::read_mesh(mesh, argv[1], ropt))
+    {
+        std::cerr << "Error loading mesh from file " << std::endl;
+        return 1;
+    }
+
+    mesh.update_normals();
+
+    AABBTree tree;
+    tree.Build(mesh, 20);
+
+    auto bounds = tree.GetBounds();
+
+    ShapeDiameterFuncTest(mesh, tree, nIter);
+
+    OctreeTest(mesh, tree, nIter);
 
     // SimVolumeTest(nIter, nCycles, bounds, step, dT, ff);
 
     // SimulateCloth(mesh);
 
-    // SimulateSandCastle(mesh, step, nIter);
+    SimulateSandCastle(mesh, step, nIter);
+
+    exit(0);
 }

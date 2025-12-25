@@ -5,6 +5,7 @@
 #include <functional>
 #include "happly.h"
 #include "AABBTree.h"
+#include "tools3d.h"
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Dense>
 // ----------------------------------------------------------------------------
@@ -656,4 +657,162 @@ std::pair<Eigen::Vector3d, MyMesh::HalfedgeHandle> MakeStep(MyMesh &mesh, Eigen:
     }
 
   return std::make_pair(exitPoint, exitHedge);
+}
+
+bool DoTrianglesIntersect(MyMesh &mesh, const std::vector<MyMesh::VertexHandle> &newTriangle, const std::vector <MyMesh::FaceHandle> & triangles)
+{
+  std::vector<std::array<double, 3>> triA;
+
+  for(const auto &vertex : newTriangle) {
+    auto point = mesh.point(vertex);
+    triA.push_back({point[0], point[1], point[2]});
+  }
+
+  for(const auto &triangle : triangles) {
+
+    std::vector<MyMesh::VertexHandle> vertices;
+    std::vector<std::array<double, 3>> triB;
+
+    for (auto fv_it = mesh.cfv_iter(triangle); fv_it.is_valid(); ++fv_it)
+    {
+      vertices.push_back(*fv_it);
+      auto point = mesh.point(*fv_it);
+      triB.push_back({point[0], point[1], point[2]});
+    }
+
+    // check if newTriangle and triangle have common vertices
+
+    std::vector<MyMesh::VertexHandle> commonVertices;
+
+    for(const auto vA : newTriangle)
+      for(const auto vB : vertices)
+        if(vA == vB)
+          commonVertices.push_back(vA);
+
+    Triangle3d triangleA(toVec(triA[0]), toVec(triA[1]), toVec(triA[2]));
+    Triangle3d triangleB(toVec(triB[0]), toVec(triB[1]), toVec(triB[2]));
+
+    // if has common edge
+    if (commonVertices.size() == 2)
+    {
+      double dotProd = triangleA.GetNormal().dot(triangleB.GetNormal());
+
+      if(dotProd < -0.999) {
+        printf("!!! edge intersection !!!\n");
+        return true;
+      }
+
+      return false;
+    }
+    //  if has common vertex
+    else if (commonVertices.size() == 1)
+    {
+      auto commonVertex = commonVertices[0];
+      // check if non-common edge intersects other facet
+
+
+      // get non-common edge of newTriangle
+      std::vector<MyMesh::VertexHandle> nonCommonA;
+      for (const auto vA : newTriangle)
+        if(vA != commonVertex)
+          nonCommonA.push_back(vA);
+
+      if (nonCommonA.size() != 2)
+        printf("!!! wrong number of non common vertices !!!\n");
+
+      // check if non-common edge intersects triangle
+      {
+      auto pntA = toVec(mesh.point(nonCommonA[0]));
+      auto pntB = toVec(mesh.point(nonCommonA[1]));
+      Line3d segA(pntA, pntB);
+
+      std::pair<double, double> params = {-1, -1};
+      int nX = triangleB.IntersectLine(segA, &params);
+
+      std::vector<Eigen::Vector3d> testPoints;
+      if (nX > 0 &&((0.0 <= params.first && params.first <= 1.0)))
+        testPoints.push_back(segA.Eval(params.first));
+
+      if (nX > 1 && (0.0 <= params.second && params.second <= 1.0))
+        testPoints.push_back(segA.Eval(params.first));
+
+      for (const auto &testPoint : testPoints)
+        if (triangleA.IsPointInside(testPoint))
+          {
+            triangleA.Print();
+            triangleB.Print();
+
+            printf("common %d, non-common %d, %d\n", commonVertex.idx(), nonCommonA[0].idx(), nonCommonA[1].idx());
+
+            printf("!!! vertex intersection !!!\n");
+            getchar();
+            return true;
+          }
+      }
+
+      // get non-common edge of vertices
+      std::vector<MyMesh::VertexHandle> nonCommonB;
+      for (const auto vB : vertices)
+        if (vB != commonVertex)
+          nonCommonB.push_back(vB);
+
+      if (nonCommonB.size() != 2)
+        printf("!!! wrong number of non common vertices !!!\n");
+
+        // TODO : a function to check intersection of triangle with segment
+      {
+      auto pntC = toVec(mesh.point(nonCommonB[0]));
+      auto pntD = toVec(mesh.point(nonCommonB[1]));
+      Line3d segB(pntC, pntD);
+
+      std::pair<double, double> params = {-1, -1};
+      int nX = triangleA.IntersectLine(segB, &params);
+
+      std::vector<Eigen::Vector3d> testPoints;
+      if (nX > 0 && ((0.0 <= params.first && params.first <= 1.0)))
+        testPoints.push_back(segB.Eval(params.first));
+
+      if( nX > 1 && (0.0 <= params.second && params.second <= 1.0))
+        testPoints.push_back(segB.Eval(params.first));
+
+      for(const auto &testPoint : testPoints)
+        if (triangleA.IsPointInside(testPoint))
+        {
+          printf("%.6f %.6f %.6f 0 0 255\n", testPoint[0], testPoint[1], testPoint[2]);
+
+          triangleA.Print();
+          triangleB.Print();
+
+          printf("common %d, non-common %d, %d\n", commonVertex.idx(), nonCommonB[0].idx(), nonCommonB[1].idx());
+
+          printf("!!! vertex intersection !!!\n");
+          getchar();
+          return true;
+        }
+      }
+      return false;
+    }
+
+    double V0[3] = { triA[0][0], triA[0][1], triA[0][2]};
+
+    double V1[3] = { triA[1][0], triA[1][1], triA[1][2]};
+
+    double V2[3] = { triA[2][0], triA[2][1], triA[2][2]};
+
+    double U0[3] = { triB[0][0], triB[0][1], triB[0][2]};
+
+    double U1[3] = { triB[1][0], triB[1][1], triB[1][2]};
+
+    double U2[3] = { triB[2][0], triB[2][1], triB[2][2]};
+
+    int doIntersect = tri_tri_intersect(V0, V1, V2, U0, U1, U2);
+
+    if(doIntersect) {
+      printf("!!! intersection !!!\n");
+      return true;
+    }
+
+  }
+
+  return false;
 }

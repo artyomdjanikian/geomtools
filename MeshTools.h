@@ -9,4 +9,5 @@ int ComputeOpaqueEdges(MyMesh &mesh, const std::vector<double> &vals, double val
 std::vector<std::pair<MyMesh::VertexHandle, MyMesh::VertexHandle>> ComputeSharpEdges(MyMesh &mesh, OpenMesh::HPropHandleT<int> &curveIds, double dihedCos);
 std::vector<Eigen::Vector3d> SampleSharpEdges(MyMesh &mesh, OpenMesh::HPropHandleT<int> &curveIds, std::vector<std::pair<MyMesh::VertexHandle, MyMesh::VertexHandle>> &endpoints, double step);
 void SetDirFieldFromSharpEdges(MyMesh &mesh, OpenMesh::HPropHandleT<int> &curveIds, OpenMesh::VPropHandleT<Eigen::Vector3d> &dirField);
+bool DoTrianglesIntersect(MyMesh &mesh, const std::vector<MyMesh::VertexHandle> &newTriangle, const std::vector<MyMesh::FaceHandle> &triangles);
 // TODO : void SetDirFieldFromLoops(MyMesh &mesh, OpenMesh::VPropHandleT<int> &xLoops, OpenMesh::VPropHandleT<Eigen::Vector3d> &dirField);

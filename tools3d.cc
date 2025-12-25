@@ -63,3 +63,9 @@ std::vector<Eigen::Vector3d> Sample(const Line3d &seg, double step)
 }
 
 // TODO : Sample(const Triangle3d &triangle, double step);
+
+bool DoIntersect(const Triangle3d &triangleA, const Triangle3d &triangleB)
+{
+  
+}
+
