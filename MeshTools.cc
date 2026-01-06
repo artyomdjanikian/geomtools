@@ -701,8 +701,6 @@ bool DoTrianglesIntersect(MyMesh &mesh, const std::vector<MyMesh::VertexHandle> 
         printf("!!! edge intersection !!!\n");
         return true;
       }
-
-      return false;
     }
     //  if has common vertex
     else if (commonVertices.size() == 1)
@@ -743,9 +741,7 @@ bool DoTrianglesIntersect(MyMesh &mesh, const std::vector<MyMesh::VertexHandle> 
             triangleB.Print();
 
             printf("common %d, non-common %d, %d\n", commonVertex.idx(), nonCommonA[0].idx(), nonCommonA[1].idx());
-
             printf("!!! vertex intersection !!!\n");
-            getchar();
             return true;
           }
       }
@@ -786,32 +782,31 @@ bool DoTrianglesIntersect(MyMesh &mesh, const std::vector<MyMesh::VertexHandle> 
           printf("common %d, non-common %d, %d\n", commonVertex.idx(), nonCommonB[0].idx(), nonCommonB[1].idx());
 
           printf("!!! vertex intersection !!!\n");
-          getchar();
           return true;
         }
       }
-      return false;
     }
+    else { // no common vertices 
 
-    double V0[3] = { triA[0][0], triA[0][1], triA[0][2]};
+      double V0[3] = { triA[0][0], triA[0][1], triA[0][2]};
 
-    double V1[3] = { triA[1][0], triA[1][1], triA[1][2]};
+      double V1[3] = { triA[1][0], triA[1][1], triA[1][2]};
 
-    double V2[3] = { triA[2][0], triA[2][1], triA[2][2]};
+      double V2[3] = { triA[2][0], triA[2][1], triA[2][2]};
 
-    double U0[3] = { triB[0][0], triB[0][1], triB[0][2]};
+      double U0[3] = { triB[0][0], triB[0][1], triB[0][2]};
 
-    double U1[3] = { triB[1][0], triB[1][1], triB[1][2]};
+      double U1[3] = { triB[1][0], triB[1][1], triB[1][2]};
 
-    double U2[3] = { triB[2][0], triB[2][1], triB[2][2]};
+      double U2[3] = { triB[2][0], triB[2][1], triB[2][2]};
 
-    int doIntersect = tri_tri_intersect(V0, V1, V2, U0, U1, U2);
+      int doIntersect = tri_tri_intersect(V0, V1, V2, U0, U1, U2);
 
-    if(doIntersect) {
-      printf("!!! intersection !!!\n");
-      return true;
+      if(doIntersect) {
+        printf("!!! intersection !!!\n");
+        return true;
+      }
     }
-
   }
 
   return false;

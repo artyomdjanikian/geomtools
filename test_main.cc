@@ -114,6 +114,30 @@ TEST(Tools3dTest, Triangle3dTest)
     EXPECT_DOUBLE_EQ(area, checkArea);
 }
 
+// triangle intersection
+TEST(Tools3dTest, TriangleIntersectionTest)
+{
+    Eigen::Vector3d pntA(38.160251617431641, 14.263562202453613, 11.124658584594727);
+    Eigen::Vector3d pntB(37.166259765625,    14.20927906036377,  11.804072380065918);
+    Eigen::Vector3d pntC(38.122127532958984, 14.510272979736328, 11.742916107177734);
+
+    Eigen::Vector3d pntD(37.582622528076172, 14.223459243774414, 11.289993286132812);
+    Eigen::Vector3d pntE(37.525806427001953, 14.278166770935059, 12.275510787963867);
+    Eigen::Vector3d pntF(37.621650695800781, 14.743742942810059, 12.143024444580078);
+
+    Triangle3d triangleB(pntA, pntB, pntC);
+
+    Triangle3d triangleA(pntD, pntE, pntF);
+
+    bool triX = DoIntersect(triangleA, triangleB);
+
+    EXPECT_EQ(triX, true);
+
+    triX = DoIntersect(triangleB, triangleA);
+
+    EXPECT_EQ(triX, true);
+}
+
 int main(int argc, char * argv[])
 {
     testing::InitGoogleTest(&argc, argv);

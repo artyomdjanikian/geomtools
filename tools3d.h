@@ -33,8 +33,6 @@ namespace {
     }
 }
 
-bool DoIntersect(const Triangle3d &triangleA, const Triangle3d &triangleB);
-
 // from tribox3.cc
 int triBoxOverlap(double boxcenter[3],double boxhalfsize[3],double triverts[3][3]);
 
@@ -595,3 +593,4 @@ private:
 };
 
 std::vector<Eigen::Vector3d> Sample(const Line3d &seg, double step);
+bool DoIntersect(const Triangle3d &triangleA, const Triangle3d &triangleB);

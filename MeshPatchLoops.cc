@@ -563,7 +563,6 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
     // TODO : Taubin smooth point cloud while pinning path points 
 
-    std::vector<MyMesh::FaceHandle> addedTriangles;
 
     auto lookupHedge = [](const MyMesh& mesh, MyMesh::VertexHandle vh_from, MyMesh::VertexHandle vh_to)
     {
@@ -584,6 +583,9 @@ void PatchLoops(MyMesh &mesh, double loopStep)
     };
 
     // add triangles to the mesh using a border edge and one of new vertices
+
+    std::vector<MyMesh::VertexHandle> pointVertices(points.size(), MyMesh::VertexHandle(-1));
+    std::vector<MyMesh::FaceHandle> addedTriangles;
 
     // TODO : mesh patcher class,
     // keep input points, keep output triangles as data member
@@ -661,17 +663,17 @@ void PatchLoops(MyMesh &mesh, double loopStep)
       return oneAdded;
     };
 
-    auto GrowFromBorderEdges = [&lookupHedge, &addedTriangles](MyMesh &mesh, const std::vector<Eigen::Vector3d> &points)
+    auto GrowFromBorderEdges = [&lookupHedge, &addedTriangles, &pointVertices](MyMesh &mesh, const std::vector<Eigen::Vector3d> &points, bool allowSplitVertices)
     {
       // fill holes in current mesh by adding triangles with new vertices
 
       // find best candidate
-      std::vector<MyMesh::VertexHandle> pointVertices(points.size(), MyMesh::VertexHandle(-1));
 
       // TODO : extract into a function
       bool oneAdded = true;
       bool avoidSplitVertices = true;
       int iTry = 0;
+      int nTotalAdded = 0;
 
       while (oneAdded)
       {
@@ -752,15 +754,19 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
             for (size_t iPnt = 0; iPnt < points.size(); iPnt++)
             {
-
               auto pnt = points[iPnt];
+
+              // if vertex is valid and has no boundary edges then adding this triangle will create a split vertex
+              bool isTriangleValid = true;
+              if (pointVertices[iPnt].is_valid() && !mesh.is_boundary(pointVertices[iPnt]))
+                isTriangleValid = false;
 
               auto param = edgeSeg.ProjectParam(pnt);
 
               //          if(iPnt == 99)
               //            printf("     %d, param %.6f\n", iPnt, param);
 
-              if (param >= 0.0 && param <= 1.0)
+              if (isTriangleValid && param >= 0.0 && param <= 1.0)
               {
                 Eigen::Vector3d projPnt = edgeSeg.Project(pnt);
 
@@ -916,6 +922,13 @@ void PatchLoops(MyMesh &mesh, double loopStep)
                     return nBoundary;
                   };
 
+                  auto isVertexComplete = [](MyMesh &mesh, MyMesh::VertexHandle vertexHandle) {
+                    if(!mesh.is_isolated(vertexHandle) && !mesh.is_boundary(vertexHandle))
+                      return true;
+
+                    return false;
+                  };
+
                   int nFrom = countBoundaryEdges(mesh, fromVertex, newEdges);
                   int nTo   = countBoundaryEdges(mesh, toVertex, newEdges);
                   int nMid  = countBoundaryEdges(mesh, pointVertices[iVpoint], newEdges);
@@ -951,26 +964,31 @@ void PatchLoops(MyMesh &mesh, double loopStep)
                     face_vhandles.push_back(toVertex);
                     face_vhandles.push_back(pointVertices[iVpoint]);
 
+                    int next_face_index = mesh.n_faces();
+
+                    // TODO : debug this
                     if( !DoTrianglesIntersect(mesh, face_vhandles, addedTriangles) ) {
                       auto faceHandle = mesh.add_face(face_vhandles);
 
                       if (faceHandle.is_valid())
                       {
-             if(faceHandle.idx() == 13263 || faceHandle.idx() == 13322) {
+//             if(faceHandle.idx() == 13263 || faceHandle.idx() == 13322) {
 
-              printf("facet %d\n", faceHandle.idx());
-                happly::PLYExport ccPly;
+//              printf("facet %d(%d)\n", faceHandle.idx(), next_face_index);
+//                happly::PLYExport ccPly;
 
-                auto v0 = ccPly.AddVertex(mesh.point(pointVertices[iVpoint])/*points[iVpoint]*/, 1.0, green, 1.0);
-                auto v1 = ccPly.AddVertex(mesh.point(fromVertex), 1.0, green, 0.5);
-                auto v2 = ccPly.AddVertex(mesh.point(toVertex), 1.0, green, 0.5);
-                ccPly.AddFacet(v0, v1, v2);
+//                auto v0 = ccPly.AddVertex(mesh.point(pointVertices[iVpoint])/*points[iVpoint]*/, 1.0, green, 1.0);
+//                auto v1 = ccPly.AddVertex(mesh.point(fromVertex), 1.0, green, 0.5);
+//                auto v2 = ccPly.AddVertex(mesh.point(toVertex), 1.0, green, 0.5);
+//                ccPly.AddFacet(v0, v1, v2);
 
-                ccPly.WritePLY("debug.ply");
+//                ccPly.WritePLY("debug.ply");
 
                 // why triangles not intersecting?
-                getchar();
-              }
+//                getchar();
+//              }
+
+
 
 
 
@@ -985,6 +1003,7 @@ void PatchLoops(MyMesh &mesh, double loopStep)
                         mesh.update_normals();
                         nAdded++;
                         oneAdded = true;
+
                         break;
                       }
                     }
@@ -1003,25 +1022,36 @@ void PatchLoops(MyMesh &mesh, double loopStep)
           static int nCandidates = 0;
           ccPly.WritePLY(std::string("candidates").append(std::to_string(nCandidates++)).append(std::string(".ply")));
           printf("write out candidates\n");
+          getchar();
         }
 
-        if(!oneAdded && avoidSplitVertices) {
-          oneAdded = true;
-          avoidSplitVertices = false;
-          printf("next cycle with split vertices\n");
-        }
-        else if (oneAdded)
-          avoidSplitVertices = true;
+        nTotalAdded += nAdded;
 
+        if(allowSplitVertices) {
+          if(!oneAdded && avoidSplitVertices) {
+            oneAdded = true;
+            avoidSplitVertices = false;
+            printf("next cycle with split vertices\n");
+            // TODO : just one cycle with split vertices
+            getchar();
+          }
+          else if (oneAdded)
+            avoidSplitVertices = true;
+        }
 //        getchar();
       }
+
+      printf("%d cycles, %d facets added\n", iTry, nTotalAdded);
+
     };
 
-    GrowFromBorderEdges(mesh, points);
-//    while(GrowByRemovingEar(mesh)) {}
-//    GrowFromBorderEdges(mesh, points);
-
+    // TODO : no split vertices allowed
+    GrowFromBorderEdges(mesh, points, false);
     getchar();
+    while(GrowByRemovingEar(mesh)) {}
+    getchar();
+//    GrowFromBorderEdges(mesh, points, true);
+//    getchar();
 
     OpenMesh::IO::write_mesh(mesh, "allcandidates.ply");
 

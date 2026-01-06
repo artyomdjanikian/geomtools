@@ -30,6 +30,9 @@ int main(int argc, char **argv)
  
   // TODO : extract into OpenMeshMP
 
+  double step = argc > 2? atof(argv[2]) : 0.125;
+  int nIter = argc > 3? atoi(argv[3]) : 100;
+
   printf("read mesh %s\n", argv[1]);
 
   OpenMesh::IO::Options ropt;
@@ -44,7 +47,7 @@ int main(int argc, char **argv)
  
   mesh.update_normals();
 
-  PatchLoops(mesh, 0.125);
+  PatchLoops(mesh, step);
 
   return 0;
 }

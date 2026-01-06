@@ -64,8 +64,22 @@ std::vector<Eigen::Vector3d> Sample(const Line3d &seg, double step)
 
 // TODO : Sample(const Triangle3d &triangle, double step);
 
-bool DoIntersect(const Triangle3d &triangleA, const Triangle3d &triangleB)
+bool DoIntersect(const Triangle3d &triA, const Triangle3d &triB)
 {
-  
+  double V0[3] = { triA.Pnt(0)[0], triA.Pnt(0)[1], triA.Pnt(0)[2]};
+
+  double V1[3] = { triA.Pnt(1)[0], triA.Pnt(1)[1], triA.Pnt(1)[2]};
+
+  double V2[3] = { triA.Pnt(2)[0], triA.Pnt(2)[1], triA.Pnt(2)[2]};
+
+  double U0[3] = { triB.Pnt(0)[0], triB.Pnt(0)[1], triB.Pnt(0)[2]};
+
+  double U1[3] = { triB.Pnt(1)[0], triB.Pnt(1)[1], triB.Pnt(1)[2]};
+
+  double U2[3] = { triB.Pnt(2)[0], triB.Pnt(2)[1], triB.Pnt(2)[2]};
+
+  int doIntersect = tri_tri_intersect(V0, V1, V2, U0, U1, U2);
+
+  return doIntersect;
 }
 
