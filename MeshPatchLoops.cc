@@ -8,7 +8,7 @@
 #include "happly.h"
 
 void PatchLoops(MyMesh &mesh, double loopStep)
-{
+{ 
     AABBTree tree;
     tree.Build(mesh, 20);
   

@@ -5,7 +5,10 @@
 #include <functional>
 #include "happly.h"
 #include "AABBTree.h"
+<<<<<<< HEAD
 #include "tools3d.h"
+=======
+>>>>>>> 2c02bf3f30c7ffab9d1ea0db43f7aa75558a0a73
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Dense>
 // ----------------------------------------------------------------------------
