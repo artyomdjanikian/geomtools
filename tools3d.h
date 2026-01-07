@@ -580,6 +580,46 @@ struct Triangle3d {
         return circumradius > eps ? (2 * inradius)/circumradius : 0.0;
     }
 
+    double Circumradius() const {
+        double a = (pnts[0]-pnts[1]).norm();
+        double b = (pnts[1]-pnts[2]).norm(); 
+        double c = (pnts[2]-pnts[0]).norm(); 
+
+        double s = (a + b + c) / 2.0;
+        double area = std::sqrt(s * (s - a) * (s - b) * (s - c));
+
+        // TODO : handle degen 
+        if(area < eps)
+            return -1.0;
+
+        double circumradius = (a * b * c) / (4 * area);
+
+        return circumradius;
+    }
+
+    Eigen::Vector3d Circumcenter() const {
+        const auto &A = pnts[0];
+        const auto &B = pnts[1];
+        const auto &C = pnts[2];
+
+        Eigen::Vector3d ab = B - A;
+        Eigen::Vector3d ac = C - A;
+        Eigen::Vector3d n  = ab.cross(ac);
+
+        double n2 = n.squaredNorm();
+        // TODO : handle degen case, for now call Circumradius and check its validity
+
+        //        if (n2 < 1e-12)
+//        {
+//            throw std::runtime_error("Triangle is degenerate (points are collinear).");
+//        }
+
+        Eigen::Vector3d term1 = ac.squaredNorm() * (n.cross(ab));
+        Eigen::Vector3d term2 = ab.squaredNorm() * (ac.cross(n));
+
+        return A + (term1 + term2) / (2.0 * n2);
+    };
+
     void Print() const {
         for(const auto &pnt : pnts)
             printf("%.6f %.6f %.6f 255 0 0\n", pnt[0], pnt[1], pnt[2]);
