@@ -2,6 +2,7 @@
 #include "ControlPrintf.h"
 #include "happly.h"
 #include "tools3d.h"
+#include "SpatialHashTable.h"
 #include <eigen3/Eigen/Dense>
 
 // for each element:
@@ -308,7 +309,7 @@ std::vector<Eigen::Vector3d> PointSetCluster(const std::vector<Eigen::Vector3d> 
     for (size_t ii = 0; ii < points.size() / clusterSize; ii++)
         clusterPoints.push_back(points[ii]);
 
-    printf("cluster %lu points\n", clusterPoints.size());
+    printf("%lu points, %lu clusters of size %lu\n", points.size(), clusterPoints.size(), clusterSize);
 
     // debug only - show points with exterior weights
     // the higher the weight, the more likely the point to lie in the point set interior
@@ -344,6 +345,7 @@ std::vector<Eigen::Vector3d> PointSetCluster(const std::vector<Eigen::Vector3d> 
         // TODO : put clusterPoints in closestPointSearch structure, like KDTree
         // for each point, find the closest cluster
 
+#pragma omp parallel for
         for (const auto &point : points)
         {
             double minDist = -1.0;
@@ -351,7 +353,6 @@ std::vector<Eigen::Vector3d> PointSetCluster(const std::vector<Eigen::Vector3d> 
 
             for (size_t iCluster = 0; iCluster < clusterPoints.size(); iCluster++)
             {
-
                 double clusterDist = (clusterPoints[iCluster] - point).norm();
 
                 if (minDist < 0.0 || clusterDist < minDist)
@@ -364,10 +365,12 @@ std::vector<Eigen::Vector3d> PointSetCluster(const std::vector<Eigen::Vector3d> 
             double weight = colorWeights[iBestCluster];
 
             //        qPly.AddVertex(point, 0.75*weight, 2.0*(1.0-weight)*weight, 0.75*(1.0-weight));
-
-            newClusterPoints[iBestCluster].first += point;
-            newClusterPoints[iBestCluster].second++;
-            clusterSizes[iBestCluster] += minDist;
+#pragma omp critical
+            {
+                newClusterPoints[iBestCluster].first += point;
+                newClusterPoints[iBestCluster].second++;
+                clusterSizes[iBestCluster] += minDist;
+            }
         }
 
         for (size_t iCluster = 0; iCluster < clusterPoints.size(); iCluster++)
@@ -408,6 +411,62 @@ std::vector<Eigen::Vector3d> PointSetCluster(const std::vector<Eigen::Vector3d> 
     }
 
     return clusterPoints;
+}
+
+// compute average distance to k nearest neighbors
+std::vector<double> PointSetComputeAverageNeighborDistance(const std::vector<Eigen::Vector3d> &points, double gridStep, int kNearest)
+{
+    SpatialHashGrid hGrid(gridStep, points);
+
+    std::vector<double> averDists(points.size(), 0.0);
+
+    for(size_t iPnt = 0; iPnt < points.size(); iPnt++) {
+        std::vector<double> dists;
+
+        int iTry = 0;
+        while(dists.size() < kNearest) {
+            iTry++;
+            dists.clear();
+            hGrid.searchRadius(points[iPnt], 3.0*gridStep*iTry, [&](size_t jPnt) {
+                if(iPnt != jPnt)
+                    dists.push_back((points[iPnt]-points[jPnt]).norm());
+                return false;
+            });
+            // if(dists.size() < kNearest) then repeat search radius with larger step
+        }
+
+        std::sort(dists.begin(), dists.end());
+
+        if(dists.size() > kNearest)
+            dists.resize(kNearest);
+
+        double averDist = 0.0;
+        for(const auto &dist : dists)
+            averDist += dist;
+
+        if(dists.size())
+            averDist /= dists.size();
+
+        averDists[iPnt] = averDist;
+    }
+
+    happly::PLYExport ePly;
+
+    for(size_t iPnt = 0; iPnt < points.size(); iPnt++) {
+        double weight = averDists[iPnt]/gridStep;
+
+        double blackout = 1.0;
+        if(weight > 1.0) {
+            blackout = 1.0/weight;
+            weight = 1.0;
+        }
+
+        ePly.AddVertex(points[iPnt], blackout*weight, blackout * 4.0 * weight * (1.0-weight), blackout * (1.0-weight));
+    }
+
+    ePly.WritePLY("density.ply");
+
+    return averDists;
 }
 
 // remove points closer than eps
