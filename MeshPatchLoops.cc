@@ -247,9 +247,13 @@ void PatchLoops(MyMesh &mesh, double loopStep)
             }
           }
 
+      // TODO : color code by density
       sPly.WritePLY("interpoints.ply");
 
-      cPly.WritePLY("fillerpoints.ply");
+//      cPly.WritePLY("fillerpoints.ply");
+
+      std::vector<double> averDists = PointSetComputeAverageNeighborDistance(allpoints, loopStep, 12);
+      // TODO : filter out all very long distances
 
       return allpoints;
     };
@@ -386,7 +390,6 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
                 if(distProd < eps && (!grid.GetPinned(ii, jj, kk) || !grid.GetPinned(iN, jN, kN)))
                 {
-
                   double paramRange = vec1[0] - vec2[0];
                   assert(fabs(paramRange) > 0.0);
 
@@ -419,7 +422,7 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
     // cluster filler points
     printf("%lu raw points\n", allpoints.size());
-    auto points = PointSetCluster(allpoints, 200, 500);
+    auto points = PointSetCluster(allpoints, 100, 500);
 
     printf("%lu border points, %lu new vertex points\n", borderPoints.size(), points.size());
 
@@ -589,7 +592,7 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
     // TODO : mesh patcher class,
     // keep input points, keep output triangles as data member
-    // two methods : GrowFromBorderEdges, GrowByRemovingEar, checking for self intersections, each does one loop over boundary edges
+    // two methods : GrowByBallPivoting, GrowByRemovingEar, checking for self intersections, each does one loop over boundary edges
     auto GrowByRemovingEar = [&lookupHedge, &addedTriangles](MyMesh &mesh)
     {
       int nAdded = 0;
@@ -619,8 +622,10 @@ void PatchLoops(MyMesh &mesh, double loopStep)
           auto triNormal = earTriangle.GetNormal();
 
 //          printf("%.6f, %.6f, %.6f\n", triNormal.dot(facetNormal), triNormal.dot(nextFacetNormal), earTriangle.AspectRatio() );
+          // TODO : check for self intersections
 
-          if (triNormal.dot(facetNormal) > 0.9 && triNormal.dot(nextFacetNormal) > 0.9 && earTriangle.AspectRatio() > 0.5) {
+
+          if (triNormal.dot(facetNormal) > 0.0 && triNormal.dot(nextFacetNormal) > 0.0 && earTriangle.AspectRatio() > 0.5) {
 ////            printf("ear candidate found\n");
               // iterate over halfedges of vertex
               // check if edge is boundary
@@ -663,17 +668,20 @@ void PatchLoops(MyMesh &mesh, double loopStep)
       return oneAdded;
     };
 
-    auto GrowFromBorderEdges = [&lookupHedge, &addedTriangles, &pointVertices](MyMesh &mesh, const std::vector<Eigen::Vector3d> &points, bool allowSplitVertices)
+    auto GrowByBallPivoting = [&lookupHedge, &addedTriangles, &pointVertices](MyMesh &mesh, const std::vector<Eigen::Vector3d> &points, bool allowSplitVertices, double ballPivotRadius)
     {
       // fill holes in current mesh by adding triangles with new vertices
 
       // find best candidate
 
       // TODO : extract into a function
+
       bool oneAdded = true;
       bool avoidSplitVertices = true;
       int iTry = 0;
       int nTotalAdded = 0;
+
+      bool doBallPivoting = true;
 
       while (oneAdded)
       {
@@ -694,6 +702,7 @@ void PatchLoops(MyMesh &mesh, double loopStep)
         oneAdded = false;
         happly::PLYExport ccPly;
 
+        // save boundary vertices
         happly::PLYExport bPly;
         for (auto hedgeHandle : mesh.halfedges())
         {
@@ -752,6 +761,7 @@ void PatchLoops(MyMesh &mesh, double loopStep)
             // helper function for edge vector
             // helper function for facet triangle
 
+            // strange way of choosing candidate
             for (size_t iPnt = 0; iPnt < points.size(); iPnt++)
             {
               auto pnt = points[iPnt];
@@ -765,6 +775,13 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
               //          if(iPnt == 99)
               //            printf("     %d, param %.6f\n", iPnt, param);
+              if(doBallPivoting) {
+                param = 0.5;
+
+                if(pointVertices[iPnt].is_valid() && (
+                    pointVertices[iPnt].idx() == toVertex.idx() || pointVertices[iPnt].idx() == fromVertex.idx()))
+                  continue;
+              }
 
               if (isTriangleValid && param >= 0.0 && param <= 1.0)
               {
@@ -773,9 +790,53 @@ void PatchLoops(MyMesh &mesh, double loopStep)
                 double dist = (projPnt - pnt).norm();
 
                 Triangle3d triangle(fromPnt, toPnt, pnt);
+                auto triNormal = triangle.GetNormal();
+
+                // ball pivoting
+                // TODO : check if circumscribed radius is smaller than pivot ball radius
+                // TODO : compute dihedral angle measure
+
+
+                if(doBallPivoting) {
+                  double circumradius = triangle.Circumradius();
+
+                  if( circumradius < ballPivotRadius) {
+
+                    Eigen::Vector3d circumcenter = triangle.Circumcenter();
+
+                    double normalShift = sqrt(ballPivotRadius*ballPivotRadius-circumradius*circumradius);
+
+                    auto centerPlus = circumcenter + triNormal*normalShift;
+                    // TODO : circumcenter of triangle, find position of ball pivot center
+
+                    Triangle3d ballPivotTriangle(fromPnt, toPnt, centerPlus);
+                    auto pivotNormal = ballPivotTriangle.GetNormal();
+
+                    // dihedral angle cos
+                    double dihedCos = facetNormal.dot(pivotNormal);
+
+                    // check if above or below 180 
+                    Eigen::Vector3d triSpan = centerPlus - (fromPnt+toPnt)*0.5;
+                    triSpan.stableNormalize();
+
+                    double dihedMeasure = 0.0;
+                    double concaveDot = triSpan.dot(facetNormal);
+                    if(concaveDot >= 0.0) // dihedral angle smallen than 180
+                      dihedMeasure = 1.0 + dihedCos;
+                    else
+                      dihedMeasure = 3.0-dihedCos;
+
+                    printf(" %lu. (%.6f, %.6f, %.6f) id %d, circumradius %.6f, dihed cos %.6f, value %.6f\n", iPnt, pnt[0], pnt[1], pnt[2], pointVertices[iPnt].idx(), circumradius, dihedCos, dihedMeasure);
+                    printf("      (%.6f, %.6f, %.6f) normal, concave dot %.6f\n", pivotNormal[0], pivotNormal[1], pivotNormal[2], concaveDot);
+
+                    candidates.push_back({dihedMeasure, iPnt});
+
+                    // dihedCos now runs from -1 to 3, ball pivoting should pick the smallest value triangle
+                  }
+                }
 
                 // TODO : sort by shortest distance
-
+                else {
                 double aspectRatio = triangle.AspectRatio();
                 auto triNormal = triangle.GetNormal();
 
@@ -827,6 +888,7 @@ void PatchLoops(MyMesh &mesh, double loopStep)
                 // if exist then compute normals
 
                 // now, each candidate has those criteria : average dihedral angle cos (best is 1.0), aspect ratio (best is 1.0)
+                }
               }
             }
 
@@ -844,6 +906,9 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
               for (size_t iMinCand = 0; iMinCand < candidates.size(); iMinCand++)
               {
+                if(doBallPivoting && iMinCand > 0)
+                  break;
+
 //                if (minVal < 0.0 || candidates[iCand].first < minVal)
 //                {
 //                  minVal = candidates[iCand].first;
@@ -851,18 +916,18 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 //                }
  //             }
 
-                if (candidates[iMinCand].first > 0.0)
+                if ( doBallPivoting || candidates[iMinCand].first > 0.0)
                 {
                   size_t iVpoint = candidates[iMinCand].second;
 
                   green += 0.025;
 
-                  auto testPnt = Eigen::Vector3d(37.2, 12.2, 10.9);
-                  if ((testPnt - points[iVpoint]).norm() < 0.1)
-                  {
-                    printf("opanki %lu, %.6f\n", candidates[iMinCand].second, candidates[iMinCand].first);
-                    ////              getchar();
-                  }
+//                  auto testPnt = Eigen::Vector3d(37.2, 12.2, 10.9);
+//                  if ((testPnt - points[iVpoint]).norm() < 0.1)
+//                  {
+//                    printf("opanki %lu, %.6f\n", candidates[iMinCand].second, candidates[iMinCand].first);
+//                    getchar();
+//                  }
 
                   if (!pointVertices[iVpoint].is_valid())
                     pointVertices[iVpoint] = mesh.add_vertex(MyMesh::Point(points[iVpoint][0], points[iVpoint][1], points[iVpoint][2]));
@@ -955,7 +1020,7 @@ void PatchLoops(MyMesh &mesh, double loopStep)
                   if(!avoidSplitVertices && n6Plus == 0)
                     splitOk = true;
 
-                  if (splitOk) {
+                  if (doBallPivoting || splitOk) {
 
                       // iterate over halfedges of vertex
                       // check if edge is boundary
@@ -972,26 +1037,6 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
                       if (faceHandle.is_valid())
                       {
-//             if(faceHandle.idx() == 13263 || faceHandle.idx() == 13322) {
-
-//              printf("facet %d(%d)\n", faceHandle.idx(), next_face_index);
-//                happly::PLYExport ccPly;
-
-//                auto v0 = ccPly.AddVertex(mesh.point(pointVertices[iVpoint])/*points[iVpoint]*/, 1.0, green, 1.0);
-//                auto v1 = ccPly.AddVertex(mesh.point(fromVertex), 1.0, green, 0.5);
-//                auto v2 = ccPly.AddVertex(mesh.point(toVertex), 1.0, green, 0.5);
-//                ccPly.AddFacet(v0, v1, v2);
-
-//                ccPly.WritePLY("debug.ply");
-
-                // why triangles not intersecting?
-//                getchar();
-//              }
-
-
-
-
-
                         auto v0 = ccPly.AddVertex(points[iVpoint], 1.0, green, 1.0);
                         auto v1 = ccPly.AddVertex(fromPnt, 1.0, green, 0.5);
                         auto v2 = ccPly.AddVertex(toPnt, 1.0, green, 0.5);
@@ -1006,7 +1051,10 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
                         break;
                       }
+                      else
+                        printf("!!! face creation failed !!!\n");
                     }
+                    else printf("!!! intersection found !!!\n");
                   }
                 }
               }
@@ -1016,13 +1064,13 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
         printf("%d boundary edges, %d triangles\n", nBoundary, nAdded);
 
-        bool saveCandidates = true;
+        bool saveCandidates = false;
 
         if(saveCandidates) {
           static int nCandidates = 0;
           ccPly.WritePLY(std::string("candidates").append(std::to_string(nCandidates++)).append(std::string(".ply")));
           printf("write out candidates\n");
-          getchar();
+//          getchar();
         }
 
         nTotalAdded += nAdded;
@@ -1038,22 +1086,100 @@ void PatchLoops(MyMesh &mesh, double loopStep)
           else if (oneAdded)
             avoidSplitVertices = true;
         }
+        oneAdded = false;
+
 //        getchar();
       }
 
       printf("%d cycles, %d facets added\n", iTry, nTotalAdded);
 
+      return nTotalAdded > 0;
     };
 
     // TODO : no split vertices allowed
-    GrowFromBorderEdges(mesh, points, false);
-    getchar();
-    while(GrowByRemovingEar(mesh)) {}
-    getchar();
-//    GrowFromBorderEdges(mesh, points, true);
+
+    bool oneAdded = false;
+    double ballPivotRadius = loopStep*8.0;
+    do {
+
+      oneAdded = GrowByBallPivoting(mesh, points, false, ballPivotRadius);
+//      getchar();
+//      bool twoAdded = GrowByRemovingEar(mesh);
+//      getchar();
+
+//      OpenMesh::IO::write_mesh(mesh, "earcandidates.ply");
+
+//      oneAdded = oneAdded || twoAdded;
+//    GrowByBallPivoting(mesh, points, true);
 //    getchar();
+    } while(oneAdded);
 
     OpenMesh::IO::write_mesh(mesh, "allcandidates.ply");
+    printf("writing all candidates\n");
+//    getchar();
+
+    std::vector<std::set<size_t>> ballPivotMatrix;
+
+    ballPivotMatrix.resize(points.size());
+    double rad = 0.5;
+    for(size_t iPnt = 0; iPnt < points.size(); iPnt++)
+      for(size_t jPnt = iPnt+1; jPnt < points.size(); jPnt++)
+        for(size_t kPnt = jPnt+1; kPnt < points.size(); kPnt++)       
+        {
+          // find sphere of rad touching those 3 points
+          Triangle3d tri(points[iPnt], points[jPnt], points[kPnt]);
+
+          double circum = tri.Circumradius();
+          if(circum < rad && circum > eps) {
+            // centroid
+
+            Eigen::Vector3d circumcenter = tri.Circumcenter();
+
+            double normalShift = sqrt(rad*rad-circum*circum);
+
+            auto normal = tri.GetNormal();
+
+            auto centerPlus = circumcenter + normal*normalShift;
+            auto centerMinus = circumcenter - normal*normalShift;
+
+            bool insidePlus = false;
+            bool insideMinus = false;
+
+            for(size_t inPnt = 0; inPnt < points.size(); inPnt++) {
+
+              if(!insidePlus) {
+                double distPlus = (points[inPnt]-centerPlus).squaredNorm();
+                if(distPlus < rad*rad - eps)
+                  insidePlus = true;
+              }
+
+              if(!insideMinus) {
+                double distMinus = (points[inPnt]-centerMinus).squaredNorm();
+                if(distMinus < rad*rad - eps)
+                  insideMinus = true;
+              }
+
+              if(insideMinus && insidePlus)
+                break;
+            }
+
+            // test how many points are inside or on the sphere
+            // if 3 then take this
+
+            if(!insideMinus && !insidePlus) {
+              ballPivotMatrix[iPnt].insert(jPnt);
+              ballPivotMatrix[jPnt].insert(iPnt);
+
+              ballPivotMatrix[iPnt].insert(kPnt);
+              ballPivotMatrix[kPnt].insert(iPnt);
+
+              ballPivotMatrix[jPnt].insert(kPnt);
+              ballPivotMatrix[kPnt].insert(jPnt);
+            }
+          }
+        }
+
+
 
     auto adjMatrix = MeshSamplingEdges(points);
 
@@ -1085,8 +1211,9 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
     MeshSamplingSave(points, adjMatrix, "origedges.ply");
     MeshSamplingSave(points, copyAdjMatrix, "normaledges.ply");
+    MeshSamplingSave(points, ballPivotMatrix, "ballpivot.ply");
 
-    MyMesh patchMesh = MeshSamplingCycles(points, copyAdjMatrix);
+    MyMesh patchMesh = MeshSamplingCycles(points, ballPivotMatrix);
 
     OpenMesh::IO::write_mesh(patchMesh, "patchmesh.ply");
 }
