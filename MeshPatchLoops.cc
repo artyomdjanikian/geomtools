@@ -23,6 +23,7 @@ void PatchLoops(MyMesh &mesh, double loopStep)
     std::set<MyMesh::VertexHandle> borderVertices;
 
     std::vector<Eigen::Vector3d> borderPoints;
+    std::vector<MyMesh::VertexHandle> borderVertexHandles;
 
     for(auto hedge : mesh.halfedges()) {
       if(mesh.is_boundary(hedge)) {
@@ -34,6 +35,7 @@ void PatchLoops(MyMesh &mesh, double loopStep)
         borderVertices.insert(fromVertex);
 
         borderPoints.push_back(toVec(mesh.point(fromVertex)));
+        borderVertexHandles.push_back(fromVertex);
 
         bounds += toVec(mesh.point(toVertex));
         bounds += toVec(mesh.point(fromVertex));
@@ -1100,6 +1102,10 @@ void PatchLoops(MyMesh &mesh, double loopStep)
 
     bool oneAdded = false;
     double ballPivotRadius = loopStep*8.0;
+
+    points.insert(points.end(), borderPoints.begin(), borderPoints.end());
+    pointVertices.insert(pointVertices.end(), borderVertexHandles.begin(), borderVertexHandles.end());
+
     do {
 
       oneAdded = GrowByBallPivoting(mesh, points, false, ballPivotRadius);
