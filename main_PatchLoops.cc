@@ -18,6 +18,9 @@
 // Import mesh with holes, patch them with facets
 // ----------------------------------------------------------------------------
 
+//./build/Build/bin/PatchLoops ~/Documents/Models/topology-optimized-bottle-opener-1.snapshot.2/Bottle_Opener_remesh_hole_pair.ply 0.07
+//./build/Build/bin/PatchLoops ~/Documents/Models/topology-optimized-bottle-opener-1.snapshot.2/Bottle_Opener_remesh_hole_pair.ply 0.125
+
 int main(int argc, char **argv)
 {
   MyMesh mesh;

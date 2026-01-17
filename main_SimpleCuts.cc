@@ -62,9 +62,12 @@ int main(int argc, char **argv)
   // PatchLoopTest(mesh, 0.125);
 
   // Bottle_Opener_remeshplys.ply
-  QuadRemeshTest(mesh, step, nIter);
+  // QuadRemeshTest(mesh, step, nIter);
 
-  // SimulateSandCastle(mesh, step, nIter);
+//  ./build/Build/bin/SimpleCuts ~/Documents/Models/simplex.ply 1000 10 0.3
+
+
+  SimulateSandCastle(mesh, step, nIter);
 
 
 
